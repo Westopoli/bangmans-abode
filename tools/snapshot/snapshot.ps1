@@ -1,5 +1,5 @@
-# ─────────────────────────────────────────────────────────────────────
-# Bangman's Abode — Snapshot Pipeline
+# ---------------------------------------------------------------------
+# Bangman's Abode -- Snapshot Pipeline
 # Triggered by AutoHotkey hotkey (End by default).
 # Workflow:
 #   1. Open MineKeep Files page in default browser, copy world download URL
@@ -10,28 +10,27 @@
 #   5. Copy rendered output to repo's map/ subfolder
 #   6. git add / commit / push
 #   7. Toast notification on completion
-# ─────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------
 
-# ─── CONFIG ─────────────────────────────────────────────────────────
+# --- CONFIG ---------------------------------------------------------
 # Edit these paths to match your machine.
 
-$RepoPath        = "C:\Users\Westley\bangmans-abode"          # local clone of the repo
+$RepoPath        = "C:\Users\Westley Yarlott\bangmans-abode"   # local clone of the repo
 $BlueMapPath     = "C:\bluemap"                                # where BlueMap-cli.jar + config live
-$BlueMapJar      = "BlueMap-5.18-cli.jar"                      # exact jar filename in $BlueMapPath
+$BlueMapJar      = "BlueMap-5.20-cli.jar"                      # exact jar filename in $BlueMapPath
 $DownloadsPath   = "$env:USERPROFILE\Downloads"                # where the browser drops world.zip
 $WorldZipName    = "world.zip"                                 # what MineKeep names the download
 $StagingPath     = "C:\bluemap\staging"                        # scratch folder for extracted world
 $MineKeepFilesURL = "https://minekeep.net/servers/y2getphljglwarhh/files"
 
 # Timeouts (seconds)
-$DownloadTimeout = 300   # 5 min wait for the download to appear
 $RenderTimeout   = 1800  # 30 min wait for render to finish (first render only; later renders incremental)
 
-# ─── HELPERS ────────────────────────────────────────────────────────
+# --- HELPERS --------------------------------------------------------
 
 function Show-Toast {
     param([string]$Title, [string]$Message)
-    # Burnt Toast not assumed installed — use plain Windows balloon via Add-Type
+    # Burnt Toast not assumed installed -- use plain Windows balloon via Add-Type
     Add-Type -AssemblyName System.Windows.Forms
     $balloon = New-Object System.Windows.Forms.NotifyIcon
     $balloon.Icon = [System.Drawing.SystemIcons]::Information
@@ -53,10 +52,10 @@ function Fail {
 function Section {
     param([string]$Text)
     Write-Host ""
-    Write-Host "── $Text ──" -ForegroundColor Cyan
+    Write-Host "-- $Text --" -ForegroundColor Cyan
 }
 
-# ─── PRE-FLIGHT CHECKS ──────────────────────────────────────────────
+# --- PRE-FLIGHT CHECKS ----------------------------------------------
 
 Section "Pre-flight checks"
 
@@ -70,7 +69,7 @@ try { $null = & java -version 2>&1 } catch { Fail "java not on PATH. Reinstall T
 
 Write-Host "All pre-flight checks passed." -ForegroundColor Green
 
-# ─── STEP 1: PROMPT USER TO DOWNLOAD WORLD ─────────────────────────
+# --- STEP 1: PROMPT USER TO DOWNLOAD WORLD -------------------------
 
 Section "Step 1: Download world.zip from MineKeep"
 
@@ -84,33 +83,23 @@ if (Test-Path $oldZip) {
 # Open MineKeep Files page in default browser
 Write-Host "Opening MineKeep Files page in your browser."
 Write-Host "Click the 'world' folder, then click the download button."
-Write-Host "(Waiting up to $DownloadTimeout seconds for $WorldZipName to appear in Downloads...)"
 Start-Process $MineKeepFilesURL
 
-# Watch for world.zip
-$elapsed = 0
-$found = $false
-while ($elapsed -lt $DownloadTimeout) {
-    if (Test-Path $oldZip) {
-        # Wait an extra 3 seconds to make sure download is really finished (file size stable)
-        $size1 = (Get-Item $oldZip).Length
-        Start-Sleep -Seconds 3
-        $size2 = (Get-Item $oldZip).Length
-        if ($size1 -eq $size2 -and $size1 -gt 0) {
-            $found = $true
-            break
-        }
-    }
-    Start-Sleep -Seconds 2
-    $elapsed += 2
-}
+# Wait for user to confirm download is complete
+Read-Host "Press Enter once world.zip has finished downloading"
 
-if (-not $found) { Fail "world.zip never appeared in Downloads within ${DownloadTimeout}s." }
+# Verify the file actually exists and is stable
+if (-not (Test-Path $oldZip)) { Fail "world.zip not found in Downloads. Make sure the file is named '$WorldZipName'." }
+
+$size1 = (Get-Item $oldZip).Length
+Start-Sleep -Seconds 2
+$size2 = (Get-Item $oldZip).Length
+if ($size1 -ne $size2 -or $size1 -eq 0) { Fail "world.zip doesn't look fully downloaded yet (file size still changing). Wait a moment and run again." }
 
 $sizeMB = [math]::Round((Get-Item $oldZip).Length / 1MB, 1)
 Write-Host "Got world.zip ($sizeMB MB)" -ForegroundColor Green
 
-# ─── STEP 2: EXTRACT TO STAGING ─────────────────────────────────────
+# --- STEP 2: EXTRACT TO STAGING -------------------------------------
 
 Section "Step 2: Extract world.zip"
 
@@ -120,20 +109,32 @@ if (Test-Path $StagingPath) {
 }
 New-Item -ItemType Directory -Path $StagingPath | Out-Null
 
-Write-Host "Extracting..."
-Expand-Archive -Path $oldZip -DestinationPath $StagingPath -Force
+# Extract to a temp subfolder, then normalize the result to $StagingPath\world\
+# regardless of whether the zip is flat (region/ at root) or nested (world/region/...).
+# The map configs point to $StagingPath\world, so this keeps them stable.
+$extractTmp = Join-Path $StagingPath "_extract"
+New-Item -ItemType Directory -Path $extractTmp | Out-Null
 
-# MineKeep zips usually contain a top-level 'world' folder.
-# Verify it has a region/ subfolder which is the actual world data.
-$worldDir = Get-ChildItem -Path $StagingPath -Directory | Select-Object -First 1
-if (-not $worldDir) { Fail "Extracted zip is empty?" }
-if (-not (Test-Path "$($worldDir.FullName)\region")) {
-    Fail "Extracted folder doesn't look like a Minecraft world (no region/ subfolder). Got: $($worldDir.FullName)"
+Write-Host "Extracting..."
+Expand-Archive -Path $oldZip -DestinationPath $extractTmp -Force
+
+$WorldTarget = Join-Path $StagingPath "world"
+if (Test-Path "$extractTmp\region") {
+    # Flat -- rename _extract to world
+    Rename-Item -Path $extractTmp -NewName "world"
+} else {
+    # Nested -- find the inner folder containing region/ and promote it to staging\world
+    $inner = Get-ChildItem -Path $extractTmp -Directory | Where-Object { Test-Path "$($_.FullName)\region" } | Select-Object -First 1
+    if (-not $inner) { Fail "Could not find a region/ folder in the extracted zip. Is this a valid Minecraft world?" }
+    Move-Item -Path $inner.FullName -Destination $WorldTarget
+    Remove-Item -Recurse -Force $extractTmp
 }
 
-Write-Host "Extracted to $($worldDir.FullName)" -ForegroundColor Green
+if (-not (Test-Path "$WorldTarget\region")) { Fail "World normalization failed -- no region/ folder at $WorldTarget" }
 
-# ─── STEP 3: BLUEMAP RENDER ─────────────────────────────────────────
+Write-Host "Extracted to $WorldTarget" -ForegroundColor Green
+
+# --- STEP 3: BLUEMAP RENDER -----------------------------------------
 
 Section "Step 3: BlueMap render"
 
@@ -144,17 +145,61 @@ Section "Step 3: BlueMap render"
 Push-Location $BlueMapPath
 try {
     Write-Host "Running BlueMap CLI (this can take a while on first render)..."
-    $proc = Start-Process -FilePath "java" `
-        -ArgumentList "-jar", $BlueMapJar, "-r" `
-        -NoNewWindow -PassThru `
-        -RedirectStandardOutput "$BlueMapPath\last-render.log" `
-        -RedirectStandardError  "$BlueMapPath\last-render.err"
-    if (-not $proc.WaitForExit($RenderTimeout * 1000)) {
-        $proc.Kill()
-        Fail "BlueMap render timed out after ${RenderTimeout}s. Check $BlueMapPath\last-render.log"
+
+    # Use System.Diagnostics.Process directly. Start-Process -RedirectStandard*
+    # in Windows PowerShell 5.1 produces a Process whose ExitCode is unreliable
+    # (often $null even after WaitForExit), which causes false failure reports.
+    $logPath = "$BlueMapPath\last-render.log"
+    $errPath = "$BlueMapPath\last-render.err"
+    if (Test-Path $logPath) { Remove-Item $logPath -Force }
+    if (Test-Path $errPath) { Remove-Item $errPath -Force }
+
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = "java"
+    $psi.Arguments = "-jar `"$BlueMapJar`" -r"
+    $psi.WorkingDirectory = $BlueMapPath
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+
+    $proc = New-Object System.Diagnostics.Process
+    $proc.StartInfo = $psi
+
+    $stdoutSb = New-Object System.Text.StringBuilder
+    $stderrSb = New-Object System.Text.StringBuilder
+    $stdoutEvent = Register-ObjectEvent -InputObject $proc -EventName OutputDataReceived -Action {
+        if ($EventArgs.Data) { [void]$Event.MessageData.AppendLine($EventArgs.Data) }
+    } -MessageData $stdoutSb
+    $stderrEvent = Register-ObjectEvent -InputObject $proc -EventName ErrorDataReceived -Action {
+        if ($EventArgs.Data) { [void]$Event.MessageData.AppendLine($EventArgs.Data) }
+    } -MessageData $stderrSb
+
+    [void]$proc.Start()
+    $proc.BeginOutputReadLine()
+    $proc.BeginErrorReadLine()
+
+    $exited = $proc.WaitForExit($RenderTimeout * 1000)
+    if (-not $exited) {
+        try { $proc.Kill() } catch {}
+        Unregister-Event -SourceIdentifier $stdoutEvent.Name -ErrorAction SilentlyContinue
+        Unregister-Event -SourceIdentifier $stderrEvent.Name -ErrorAction SilentlyContinue
+        Set-Content -Path $logPath -Value $stdoutSb.ToString() -Encoding UTF8
+        Set-Content -Path $errPath -Value $stderrSb.ToString() -Encoding UTF8
+        Fail "BlueMap render timed out after ${RenderTimeout}s. Check $logPath"
     }
-    if ($proc.ExitCode -ne 0) {
-        Fail "BlueMap exited with code $($proc.ExitCode). Check $BlueMapPath\last-render.err"
+
+    # Block until async readers finish flushing.
+    $proc.WaitForExit()
+    Unregister-Event -SourceIdentifier $stdoutEvent.Name -ErrorAction SilentlyContinue
+    Unregister-Event -SourceIdentifier $stderrEvent.Name -ErrorAction SilentlyContinue
+
+    Set-Content -Path $logPath -Value $stdoutSb.ToString() -Encoding UTF8
+    Set-Content -Path $errPath -Value $stderrSb.ToString() -Encoding UTF8
+
+    $exitCode = $proc.ExitCode
+    if ($exitCode -ne 0) {
+        Fail "BlueMap exited with code $exitCode. Check $errPath"
     }
 } finally {
     Pop-Location
@@ -162,7 +207,7 @@ try {
 
 Write-Host "Render complete." -ForegroundColor Green
 
-# ─── STEP 4: COPY RENDERED MAP INTO REPO ────────────────────────────
+# --- STEP 4: COPY RENDERED MAP INTO REPO ----------------------------
 
 Section "Step 4: Copy rendered output to repo/map"
 
@@ -185,14 +230,14 @@ $meta = @{
 } | ConvertTo-Json
 Set-Content -Path "$RepoMapPath\snapshot.json" -Value $meta -Encoding UTF8
 
-# Sanity-check repo size before pushing — bail if map/ is over 500 MB
+# Sanity-check repo size before pushing -- bail if map/ is over 500 MB
 $mapSizeMB = [math]::Round((Get-ChildItem -Recurse $RepoMapPath | Measure-Object -Property Length -Sum).Sum / 1MB, 1)
 if ($mapSizeMB -gt 500) {
     Fail "map/ folder is $mapSizeMB MB (cap is 500). Trim render-mask in BlueMap config and try again."
 }
 Write-Host "Map output: $mapSizeMB MB" -ForegroundColor Green
 
-# ─── STEP 5: GIT COMMIT + PUSH ──────────────────────────────────────
+# --- STEP 5: GIT COMMIT + PUSH --------------------------------------
 
 Section "Step 5: git commit & push"
 
@@ -205,11 +250,11 @@ try {
     $status = git status --porcelain map/
     if (-not $status) {
         Write-Host "No changes to commit (map identical to last snapshot)." -ForegroundColor Yellow
-        Show-Toast -Title "Snapshot complete" -Message "Map already up to date — no changes pushed."
+        Show-Toast -Title "Snapshot complete" -Message "Map already up to date -- no changes pushed."
         exit 0
     }
 
-    $commitMsg = "Map snapshot — $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+    $commitMsg = "Map snapshot -- $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
     git commit -m $commitMsg 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) { Fail "git commit failed" }
 

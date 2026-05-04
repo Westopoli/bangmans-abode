@@ -47,8 +47,9 @@
 // ─── CONFIG ───────────────────────────────────────────────────────────
 const SERVER_BEDROCK = "bangmansabode.bedrock.minekeep.gg";
 const SERVER_JAVA = "bangmansabode.minekeep.gg";
-const BLUEMAP_URL = ""; // paste your BlueMap URL once running
-const STATUS_API = `https://api.mcsrvstat.us/bedrock/3/${SERVER_BEDROCK}`;
+const BLUEMAP_URL = "./map/"; // served from this same repo by the snapshot pipeline
+const STATUS_API = `https://api.mcsrvstat.us/3/${SERVER_JAVA}`;
+const SERVER_VERSION = "1.21.4";
 const REFRESH_MS = 60000;
 
 // ─── FONT ─────────────────────────────────────────────────────────────
@@ -215,7 +216,7 @@ function TopBar({ status, onRefresh }) {
 function StatusCards({ status }) {
   const cards = [
     { label: "PLAYERS", value: status?.online ? `${status.players?.online || 0} / ${status.players?.max || "?"}` : "—" },
-    { label: "VERSION", value: status?.version || "—" },
+    { label: "VERSION", value: SERVER_VERSION },
     { label: "GAMEMODE", value: status?.gamemode || "Survival" },
     { label: "MOTD", value: status?.motd?.clean?.[0]?.slice(0, 30) || "—" },
   ];
