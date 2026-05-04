@@ -50,6 +50,8 @@ const SERVER_JAVA = "bangmansabode.minekeep.gg";
 const BLUEMAP_URL = "./map/"; // served from this same repo by the snapshot pipeline
 const STATUS_API = `https://api.mcsrvstat.us/3/${SERVER_JAVA}`;
 const SERVER_VERSION = "1.21.4";
+const SERVER_MAX_PLAYERS = 10;
+const SERVER_MOTD = "Bailey Bangman returns...";
 const REFRESH_MS = 60000;
 
 // ─── FONT ─────────────────────────────────────────────────────────────
@@ -215,10 +217,10 @@ function TopBar({ status, onRefresh }) {
 // ─── STATUS CARDS ─────────────────────────────────────────────────────
 function StatusCards({ status }) {
   const cards = [
-    { label: "PLAYERS", value: status?.online ? `${status.players?.online || 0} / ${status.players?.max || "?"}` : "—" },
+    { label: "PLAYERS", value: status?.online ? `${status.players?.online || 0} / ${SERVER_MAX_PLAYERS}` : "—" },
     { label: "VERSION", value: SERVER_VERSION },
     { label: "GAMEMODE", value: status?.gamemode || "Survival" },
-    { label: "MOTD", value: status?.motd?.clean?.[0]?.slice(0, 30) || "—" },
+    { label: "MOTD", value: SERVER_MOTD },
   ];
   return (
     <div style={S.cardsRow}>
