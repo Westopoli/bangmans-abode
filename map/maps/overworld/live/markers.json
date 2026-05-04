@@ -1,1 +1,1 @@
-{}
+{"landmarks":{"label":"Landmarks","toggleable":true,"defaultHidden":false,"sorting":0,"markers":{"spawn":{"classes":[],"anchor":{"x":8,"y":8},"html":"\u003cdiv style\u003d\u0027width:14px;height:14px;border-radius:50%;background:#5cb85c;border:2px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.6);\u0027\u003e\u003c/div\u003e","minDistance":0.0,"maxDistance":100000.0,"type":"html","label":"Spawn","position":{"x":0,"y":64,"z":0},"sorting":0,"listed":true}}}}
