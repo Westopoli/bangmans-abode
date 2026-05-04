@@ -605,8 +605,8 @@ function ConnectTab() {
           </Step>
           <Step n={2}>
             Choose <Val>Settings</Val> → <Val>Set Up Internet Connection</Val>.
-            Pick your WiFi (or wired connection) and choose <Val>Custom</Val> or
-            <Val>Advanced Settings</Val>.
+            Pick your WiFi (or wired connection) and choose <Val>Custom</Val>{" "}
+            or <Val>Advanced Settings</Val>.
           </Step>
           <Step n={3}>
             When you get to <Val>DNS Settings</Val>, choose <Val>Manual</Val>.
@@ -658,7 +658,7 @@ function ConnectTab() {
             Then choose <Val>Change Settings</Val>.
           </Step>
           <Step n={4}>
-            Scroll down and find <Val>DNS Settings</Val>. Change it from
+            Scroll down and find <Val>DNS Settings</Val>. Change it from{" "}
             <Val>Automatic</Val> to <Val>Manual</Val>.
           </Step>
           <Step n={5}>
@@ -992,7 +992,7 @@ const S = {
     padding: "12px 0", fontSize: 11, color: C.textDim,
   },
   // Connect tab
-  connectWrap: { padding: "32px 40px 48px", maxWidth: 1400, width: "100%" },
+  connectWrap: { padding: "32px 40px 48px", maxWidth: 1400, width: "100%", margin: "0 auto" },
   sectionTitle: {
     fontSize: 22, fontWeight: 600, color: C.text, margin: "0 0 6px",
     fontFamily: '"Chakra Petch", sans-serif',
@@ -1080,8 +1080,8 @@ const S = {
     fontFamily: '"Chakra Petch", sans-serif', marginTop: 1,
   },
   stepBody: {
-    flex: 1, fontSize: 14, color: C.text, lineHeight: 1.65,
-    display: "flex", flexDirection: "column", gap: 10,
+    flex: 1, fontSize: 14, color: C.text, lineHeight: 1.85,
+    paddingTop: 3, // align baseline with the step number circle
   },
 
   // Inline value chip (for button names, DNS values shown inline)
@@ -1090,13 +1090,13 @@ const S = {
     background: `${C.accent}18`, border: `1px solid ${C.accent}35`,
     borderRadius: 5, color: C.accentBright,
     fontFamily: '"JetBrains Mono", monospace', fontSize: 12.5,
-    whiteSpace: "nowrap",
+    whiteSpace: "nowrap", verticalAlign: "baseline", lineHeight: 1.4,
   },
 
   // Address chip — prominent click-to-copy block under a step
   addrChip: {
     display: "flex", alignItems: "center", justifyContent: "space-between",
-    width: "100%", padding: "12px 16px", marginTop: 2,
+    width: "100%", padding: "12px 16px", marginTop: 10,
     background: C.bg3, border: `1px solid ${C.borderLight}`, borderRadius: 8,
     color: C.accent, cursor: "pointer",
     fontFamily: '"JetBrains Mono", monospace', fontSize: 13,
