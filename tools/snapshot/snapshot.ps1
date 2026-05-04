@@ -222,6 +222,21 @@ New-Item -ItemType Directory -Path $RepoMapPath | Out-Null
 robocopy $BlueMapWebOutput $RepoMapPath /E /NFL /NDL /NP /NJH /NJS | Out-Null
 if ($LASTEXITCODE -gt 7) { Fail "robocopy failed with exit code $LASTEXITCODE" }
 
+# Decompress textures.json.gz -> textures.json for every map.
+# BlueMap's webapp requests "textures.json" (without .gz) and relies on the
+# host doing transparent gzip negotiation. BlueMap's bundled webserver does
+# this; GitHub Pages does not. So we ship the decompressed JSON directly.
+Get-ChildItem -Path "$RepoMapPath\maps" -Recurse -Filter "textures.json.gz" -ErrorAction SilentlyContinue | ForEach-Object {
+    $gzPath = $_.FullName
+    $jsonPath = $gzPath.Substring(0, $gzPath.Length - 3)  # strip ".gz"
+    $inFs  = [System.IO.File]::OpenRead($gzPath)
+    $gzStream = New-Object System.IO.Compression.GZipStream($inFs, [System.IO.Compression.CompressionMode]::Decompress)
+    $outFs = [System.IO.File]::Create($jsonPath)
+    $gzStream.CopyTo($outFs)
+    $outFs.Close(); $gzStream.Close(); $inFs.Close()
+    Remove-Item $gzPath -Force
+}
+
 # Write a metadata file with timestamp for the dashboard "Last updated" indicator
 $meta = @{
     timestamp = (Get-Date -Format "o")
