@@ -51,7 +51,7 @@ const BLUEMAP_URL = "./map/"; // served from this same repo by the snapshot pipe
 const STATUS_API = `https://api.mcsrvstat.us/3/${SERVER_JAVA}`;
 const SERVER_VERSION = "1.21.4";
 const SERVER_MAX_PLAYERS = 10;
-const SERVER_MOTD = "Bailey Bangman returns...";
+const SERVER_MOTD = "Bangman *cough* Bailey returns...";
 const REFRESH_MS = 60000;
 const DAD_IMG = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCABAAEADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDzjQ4zHYCRh94lvwqy2omP70LACrNrGsdrGmMBVFU726WPggEHjpmsX2PRirali31aKTIDEH0q8l+hIAwR9a4w6taS3HlCLEmSOhU5rR050MgCOQf7rVzyR006nmdXHcq3IOK0LG+VGGelc4owO9Vbq8kh/wBWDxWdjo5ranp1rdxOBjGTReTbY2I6AV5xZ69drjbAxro7DWpb1Gt54SGZG+b04qlGxEqqZhIp8kDqQMGqTkAsrqCDxVnR2drVRMcydyaLuDJPFdE9DmpWkjnpbWGK5e4iULM2ctjml06JjMDg7VOQa0Xt1zgirNtDuICAGoi77luFti2kMn2eSUodoUkfWuM1MXU3m+U58z+E5/zivVLO3M2kyxgZbHArk7+wQy70G1+/vUxtuXUg1ZGHotpfCBWaQvJnlW7D6+tdxpEDw2ctzMCNqEc/Sq2g6fLJIN4ITPfvV3x1eJYaRHbxkb53Cgew5P8ASiUiVT5Y3bOe0+XEvlg8qoYf1rQlG4ZrlYblo/EMWAfLx5T/APAun611zL8ma1qanPhpWMu6U7GArQsvJihCrgnruHeqVxJnICnFUY2MLkxAj+VYpWR2t3aseiaFexxoyuy7cZ5rA19oo9XzAQ0Mih8ehyc1k21xLMdg4DcHaas3EP70gZ9qhKyuaSnfc37C9TywBgVyHjuO8urmOcQyG1iACuOeT1P8q2bV4YGRrpisQ5bHXGf889q6WO8gSSOGWRGSdcwzD7si+nsfUVooXRx162vKjyaRDi5nHLpNHjHsM111lcLc2auhBBXtXO2iCWxLYz5krv8AgBtqtoc8uk6mtq7FrKZtqkn7jVo9TmpytY3NQM6IXgZQw52suQRXM3Gv3EMu2ezjJHdXwD+dddeFdxDdDWHc2CzOcbXHvWSktmego32dhug+IJJ7oxxaemDwGaTp+VdVbK8sg3YJY8YFYej2MdswAALN6VtWtzu1iCKNswxozMQP4gcfpTS5nZGdafJHV3LOoWyxSQsclCDC5PQ7uh/PFGoQx28NrbhipeQK4B4bbGMnHTOT161Jfp5lhOSB93cD7jmo9VkD3Onjdk7HkP44HP5Voee3d6n/2Q==";
 
@@ -747,8 +747,8 @@ const S = {
     background: C.bg2, border: `1px solid ${C.border}`, borderRadius: 14,
     padding: "48px 22px", display: "flex", flexDirection: "column", gap: 10,
   },
-  cardLabel: { fontSize: 14, fontWeight: 600, letterSpacing: 1.2, color: C.textMuted },
-  cardValue: { fontSize: 24, fontWeight: 600, color: C.text },
+  cardLabel: { fontSize: 9, fontWeight: 600, letterSpacing: 1.2, color: C.textMuted },
+  cardValue: { fontSize: 16, fontWeight: 600, color: C.text },
   // Map
   mapWrap: {
     flex: 1, margin: "16px 28px 28px", borderRadius: 14, overflow: "hidden",
@@ -926,14 +926,14 @@ const S = {
     display: "flex", alignItems: "center", gap: 20,
   },
   ctaTitle: {
-    display: "block", fontSize: 23, fontWeight: 600, color: C.text,
-    fontFamily: '"Chakra Petch", sans-serif', marginBottom: 6,
+    display: "block", fontSize: 15, fontWeight: 600, color: C.text,
+    fontFamily: '"Chakra Petch", sans-serif', marginBottom: 4,
   },
   ctaDesc: {
-    display: "block", fontSize: 18, color: C.textDim, lineHeight: 1.4,
+    display: "block", fontSize: 12, color: C.textDim, lineHeight: 1.4,
   },
   ctaArrow: {
-    fontSize: 28, color: C.accent, fontWeight: 300, flexShrink: 0,
+    fontSize: 24, color: C.accent, fontWeight: 300, flexShrink: 0,
     marginLeft: 24,
   },
   // Dad tab
