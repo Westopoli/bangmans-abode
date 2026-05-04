@@ -10,6 +10,29 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body, #root { height: 100%; width: 100%; overflow: hidden; }
     body { background: #111214; }
+
+    /* Responsive: stack the Connect grid on narrow screens */
+    @media (max-width: 900px) {
+      .connect-grid {
+        grid-template-columns: 1fr !important;
+      }
+      .connect-grid .empty-cell {
+        display: none !important;
+      }
+    }
+
+    /* Hover states for elements that can't easily do it inline */
+    .help-banner:hover {
+      border-color: #6fcf6f !important;
+      transform: translateY(-1px);
+    }
+    .addr-chip:hover {
+      background: #32353a !important;
+      border-color: #5cb85c !important;
+    }
+    .card-header:hover {
+      background: #282a2e !important;
+    }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
@@ -429,77 +452,246 @@ function PlayerPanel({ status }) {
 
 // ─── CONNECTION GUIDE ─────────────────────────────────────────────────
 function ConnectTab() {
-  const [expanded, setExpanded] = useState(null);
-  const toggle = (id) => setExpanded(expanded === id ? null : id);
+  // Multi-open accordion: a Set of expanded card ids. All closed on first visit.
+  const [expanded, setExpanded] = useState(() => new Set());
+  const toggle = (id) => setExpanded((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
   const [copied, setCopied] = useState(null);
   const copy = (t, k) => { navigator.clipboard.writeText(t); setCopied(k); setTimeout(() => setCopied(null), 1500); };
 
-  const sections = [
+  // Reusable: a copyable address chip
+  const AddrChip = ({ value, k }) => (
+    <button className="addr-chip" style={S.addrChip} onClick={() => copy(value, k)} title="Click to copy">
+      <span style={S.addrChipText}>{value}</span>
+      <span style={S.addrChipCopy}>{copied === k ? "Copied!" : "Copy"}</span>
+    </button>
+  );
+
+  // Reusable: an inline value chip (DNS numbers, button names, etc.)
+  const Val = ({ children }) => <code style={S.valChip}>{children}</code>;
+
+  // Reusable: one numbered step
+  const Step = ({ n, children }) => (
+    <div style={S.step}>
+      <div style={S.stepNum}>{n}</div>
+      <div style={S.stepBody}>{children}</div>
+    </div>
+  );
+
+  // Reusable: the "why we do this" footer that appears on console cards
+  const ConsoleFooter = () => (
+    <div style={S.consoleFooter}>
+      <strong style={S.consoleFooterTitle}>Why all these steps?</strong>
+      <span>
+        Microsoft, Sony, and Nintendo don't let consoles type in custom server addresses.
+        We use a free service called <Val>BedrockConnect</Val> that pretends to be a featured server,
+        then lets you pick our server from a list. The DNS change is what tells your console
+        to talk to BedrockConnect.
+      </span>
+    </div>
+  );
+
+  const cards = [
     {
-      id: "java", title: "Java Edition", desc: "PC / Mac / Linux",
+      id: "java", title: "Java Edition", platform: "PC, Mac, or Linux",
       content: (
-        <div style={S.connectContent}>
-          <p style={S.connectP}>Open Minecraft Java → Multiplayer → Add Server</p>
-          <button style={S.connectCopy} onClick={() => copy(SERVER_JAVA, "cj")}>
-            {SERVER_JAVA} {copied === "cj" ? " ✓" : ""}
-          </button>
+        <div style={S.cardContent}>
+          <Step n={1}>
+            Open Minecraft on your computer. Make sure it's the Java edition
+            (the one you bought from minecraft.net, not from the Microsoft Store).
+          </Step>
+          <Step n={2}>
+            On the main menu, click the <Val>Multiplayer</Val> button.
+          </Step>
+          <Step n={3}>
+            At the bottom of the screen, click <Val>Add Server</Val>.
+          </Step>
+          <Step n={4}>
+            For <Val>Server Name</Val>, type anything you like — "Bangman's Abode" works.
+          </Step>
+          <Step n={5}>
+            For <Val>Server Address</Val>, copy and paste this:
+            <AddrChip value={SERVER_JAVA} k="java" />
+          </Step>
+          <Step n={6}>
+            Click <Val>Done</Val>, then double-click the new server in your list to join.
+            That's it!
+          </Step>
         </div>
       ),
     },
     {
-      id: "bedrock", title: "Bedrock", desc: "Mobile / Windows 10+",
+      id: "bedrock", title: "Bedrock Edition", platform: "Phone, tablet, or Windows 10+",
       content: (
-        <div style={S.connectContent}>
-          <p style={S.connectP}>Play → Servers → scroll down → Add Server</p>
-          <button style={S.connectCopy} onClick={() => copy(SERVER_BEDROCK, "cb")}>
-            {SERVER_BEDROCK} {copied === "cb" ? " ✓" : ""}
-          </button>
-          <p style={S.connectNote}>Port: 19132 (default)</p>
+        <div style={S.cardContent}>
+          <Step n={1}>
+            Open Minecraft. This is the version you got from your phone's app store,
+            or from the Microsoft Store on Windows.
+          </Step>
+          <Step n={2}>
+            Tap <Val>Play</Val>, then tap the <Val>Servers</Val> tab at the top.
+          </Step>
+          <Step n={3}>
+            Scroll all the way down past the featured servers and tap <Val>Add Server</Val>.
+          </Step>
+          <Step n={4}>
+            For <Val>Server Name</Val>, type anything you want — "Bangman's Abode" is great.
+          </Step>
+          <Step n={5}>
+            For <Val>Server Address</Val>, copy and paste this:
+            <AddrChip value={SERVER_BEDROCK} k="bedrock" />
+          </Step>
+          <Step n={6}>
+            Leave the port as <Val>19132</Val> (it's already filled in for you).
+            Tap <Val>Save</Val>, then tap our server to join. Welcome in!
+          </Step>
         </div>
       ),
     },
     {
-      id: "xbox", title: "Xbox", desc: "DNS workaround required",
+      id: "xbox", title: "Xbox", platform: "Xbox One, Series S, Series X",
       content: (
-        <div style={S.connectContent}>
-          {[
-            "Settings → Network → Advanced → DNS → Manual",
-            <>Primary DNS: <code style={S.code}>104.238.130.180</code></>,
-            <>Secondary DNS: <code style={S.code}>8.8.8.8</code></>,
-            "Save, restart Minecraft",
-            "Servers tab → tap any featured server",
-            <>BedrockConnect menu → type <code style={S.code}>{SERVER_BEDROCK}</code></>,
-          ].map((s, i) => <p key={i} style={S.step}><span style={S.stepNum}>{i + 1}</span>{s}</p>)}
+        <div style={S.cardContent}>
+          <p style={S.cardIntro}>
+            Xbox doesn't let you type in a server address directly, so we'll use a workaround.
+            It's a one-time setup — after this, joining is easy.
+          </p>
+          <Step n={1}>
+            Press the Xbox button on your controller to open the guide.
+            Go to <Val>Profile &amp; system</Val> → <Val>Settings</Val>.
+          </Step>
+          <Step n={2}>
+            Choose <Val>General</Val> → <Val>Network settings</Val> → <Val>Advanced settings</Val>.
+          </Step>
+          <Step n={3}>
+            Select <Val>DNS settings</Val>, then choose <Val>Manual</Val>.
+          </Step>
+          <Step n={4}>
+            For <Val>Primary IPv4 DNS</Val>, type:
+            <AddrChip value="104.238.130.180" k="xbox-dns1" />
+          </Step>
+          <Step n={5}>
+            For <Val>Secondary IPv4 DNS</Val>, type:
+            <AddrChip value="8.8.8.8" k="xbox-dns2" />
+          </Step>
+          <Step n={6}>
+            Save the settings and go back. Open Minecraft and let it restart if it asks.
+          </Step>
+          <Step n={7}>
+            In Minecraft, go to <Val>Play</Val> → <Val>Servers</Val>.
+            Tap on any of the featured servers at the top of the list.
+          </Step>
+          <Step n={8}>
+            A menu will pop up. Choose <Val>Connect to a server</Val> and type:
+            <AddrChip value={SERVER_BEDROCK} k="xbox-srv" />
+          </Step>
+          <ConsoleFooter />
         </div>
       ),
     },
     {
-      id: "ps", title: "PlayStation", desc: "DNS workaround required",
+      id: "ps", title: "PlayStation", platform: "PS4 or PS5",
       content: (
-        <div style={S.connectContent}>
-          {[
-            "Settings → Network → Set Up Internet → Custom",
-            "DNS: Manual",
-            <>Primary: <code style={S.code}>45.55.68.52</code></>,
-            <>Secondary: <code style={S.code}>8.8.8.8</code></>,
-            <>Restart Minecraft → Servers → featured server → enter <code style={S.code}>{SERVER_BEDROCK}</code></>,
-          ].map((s, i) => <p key={i} style={S.step}><span style={S.stepNum}>{i + 1}</span>{s}</p>)}
+        <div style={S.cardContent}>
+          <p style={S.cardIntro}>
+            PlayStation works almost the same as Xbox — change a network setting,
+            then pick our server from a list inside Minecraft.
+          </p>
+          <Step n={1}>
+            From the PlayStation home screen, go to <Val>Settings</Val> → <Val>Network</Val>.
+          </Step>
+          <Step n={2}>
+            Choose <Val>Settings</Val> → <Val>Set Up Internet Connection</Val>.
+            Pick your WiFi (or wired connection) and choose <Val>Custom</Val> or
+            <Val>Advanced Settings</Val>.
+          </Step>
+          <Step n={3}>
+            When you get to <Val>DNS Settings</Val>, choose <Val>Manual</Val>.
+          </Step>
+          <Step n={4}>
+            For <Val>Primary DNS</Val>, type:
+            <AddrChip value="45.55.68.52" k="ps-dns1" />
+          </Step>
+          <Step n={5}>
+            For <Val>Secondary DNS</Val>, type:
+            <AddrChip value="8.8.8.8" k="ps-dns2" />
+          </Step>
+          <Step n={6}>
+            Keep going through the rest of the setup, leaving everything else as it was.
+            Test the internet connection at the end — it should work normally.
+          </Step>
+          <Step n={7}>
+            Open Minecraft and go to <Val>Play</Val> → <Val>Servers</Val>.
+            Pick any of the featured servers at the top.
+          </Step>
+          <Step n={8}>
+            When the BedrockConnect menu appears, choose <Val>Connect to a server</Val>
+            and type:
+            <AddrChip value={SERVER_BEDROCK} k="ps-srv" />
+          </Step>
+          <ConsoleFooter />
         </div>
       ),
     },
     {
-      id: "switch", title: "Nintendo Switch", desc: "DNS workaround required",
+      id: "switch", title: "Nintendo Switch", platform: "Switch or Switch OLED",
       content: (
-        <div style={S.connectContent}>
-          {[
-            "System Settings → Internet → Internet Settings",
-            "Select your WiFi → Change Settings",
-            "DNS: Manual",
-            <>Primary: <code style={S.code}>104.238.130.180</code></>,
-            <>Secondary: <code style={S.code}>8.8.8.8</code></>,
-            <>Save → restart Minecraft → Servers → featured server → enter <code style={S.code}>{SERVER_BEDROCK}</code></>,
-          ].map((s, i) => <p key={i} style={S.step}><span style={S.stepNum}>{i + 1}</span>{s}</p>)}
-          <p style={S.connectNote}>DNS is per-WiFi network. If the Servers tab doesn't appear, hold power → Restart the Switch.</p>
+        <div style={S.cardContent}>
+          <p style={S.cardIntro}>
+            Switch is a little fiddlier than Xbox or PlayStation — the DNS setting
+            lives inside your WiFi network's settings, not in a general network menu.
+            Don't worry, it's still pretty quick.
+          </p>
+          <Step n={1}>
+            From the Switch home screen, open <Val>System Settings</Val>
+            (the gear icon on the bottom row).
+          </Step>
+          <Step n={2}>
+            Scroll down on the left side and choose <Val>Internet</Val>,
+            then <Val>Internet Settings</Val>.
+          </Step>
+          <Step n={3}>
+            Pick the WiFi network you're connected to (it'll have a checkmark next to it).
+            Then choose <Val>Change Settings</Val>.
+          </Step>
+          <Step n={4}>
+            Scroll down and find <Val>DNS Settings</Val>. Change it from
+            <Val>Automatic</Val> to <Val>Manual</Val>.
+          </Step>
+          <Step n={5}>
+            Tap on <Val>Primary DNS</Val> and type:
+            <AddrChip value="104.238.130.180" k="sw-dns1" />
+          </Step>
+          <Step n={6}>
+            Tap on <Val>Secondary DNS</Val> and type:
+            <AddrChip value="8.8.8.8" k="sw-dns2" />
+          </Step>
+          <Step n={7}>
+            Choose <Val>Save</Val>. The Switch will test the connection — that's normal.
+            Press <Val>OK</Val> when it's done.
+          </Step>
+          <Step n={8}>
+            Open Minecraft. If it was already running, fully close it first
+            (hold the power button → <Val>Power Options</Val> → <Val>Restart</Val> if needed).
+          </Step>
+          <Step n={9}>
+            In Minecraft, go to <Val>Play</Val> → <Val>Servers</Val>.
+            Tap any of the featured servers at the top.
+          </Step>
+          <Step n={10}>
+            When the BedrockConnect menu shows up, pick <Val>Connect to a server</Val>
+            and type:
+            <AddrChip value={SERVER_BEDROCK} k="sw-srv" />
+          </Step>
+          <p style={S.cardTip}>
+            <strong>Tip:</strong> The DNS change only applies to the WiFi network you set it on.
+            If you take your Switch to a different WiFi (a friend's house, for example),
+            you'll need to set DNS again there.
+          </p>
+          <ConsoleFooter />
         </div>
       ),
     },
@@ -508,29 +700,63 @@ function ConnectTab() {
   return (
     <div style={S.connectWrap}>
       <h2 style={S.sectionTitle}>How to Connect</h2>
-      <p style={S.sectionSub}>Choose your platform below</p>
-      <div style={S.accordionList}>
-        {sections.map((s) => (
-          <div key={s.id} style={S.accordion}>
-            <button onClick={() => toggle(s.id)} style={{
-              ...S.accordionHeader,
-              borderColor: expanded === s.id ? C.borderLight : C.border,
-              background: expanded === s.id ? C.accentGlow : C.bg2,
-            }}>
-              <div>
-                <span style={S.accordionTitle}>{s.title}</span>
-                <span style={S.accordionDesc}>{s.desc}</span>
-              </div>
-              <span style={{
-                ...S.accordionChevron,
-                transform: expanded === s.id ? "rotate(180deg)" : "rotate(0)",
-              }}>▾</span>
-            </button>
-            {expanded === s.id && (
-              <div style={S.accordionBody}>{s.content}</div>
-            )}
+      <p style={S.sectionSub}>Find your platform, follow the steps. Click any card to open it.</p>
+
+      {/* Help banner */}
+      <a
+        href="https://discord.gg/D8PBnPRamk"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="help-banner"
+        style={S.helpBanner}
+      >
+        <div style={S.helpBannerLeft}>
+          <div style={S.helpBannerIcon}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+            </svg>
           </div>
-        ))}
+          <div>
+            <div style={S.helpBannerTitle}>Stuck? We'll walk you through it.</div>
+            <div style={S.helpBannerSub}>
+              Hop in our Discord and find <strong style={S.helpBannerName}>Westopoli</strong> —
+              happy to help, no question is too small.
+            </div>
+          </div>
+        </div>
+        <div style={S.helpBannerCta}>Open Discord →</div>
+      </a>
+
+      {/* 2x3 grid: Java, Bedrock / Xbox, PlayStation / Switch, (empty) */}
+      <div className="connect-grid" style={S.cardGrid}>
+        {cards.map((card) => {
+          const isOpen = expanded.has(card.id);
+          return (
+            <div key={card.id} style={S.connCard}>
+              <button
+                onClick={() => toggle(card.id)}
+                className="card-header"
+                style={{
+                  ...S.cardHeader,
+                  background: isOpen ? C.bg3 : C.bg2,
+                  borderColor: isOpen ? C.borderLight : C.border,
+                }}
+              >
+                <div style={S.cardHeaderText}>
+                  <div style={S.cardTitle}>{card.title}</div>
+                  <div style={S.cardPlatform}>{card.platform}</div>
+                </div>
+                <span style={{
+                  ...S.cardChevron,
+                  transform: isOpen ? "rotate(180deg)" : "rotate(0)",
+                }}>▾</span>
+              </button>
+              {isOpen && <div style={S.cardBody}>{card.content}</div>}
+            </div>
+          );
+        })}
+        {/* The 6th cell stays empty by design — leaves visual breathing room. */}
+        <div className="empty-cell" style={S.cardEmpty} aria-hidden="true" />
       </div>
     </div>
   );
@@ -766,50 +992,133 @@ const S = {
     padding: "12px 0", fontSize: 11, color: C.textDim,
   },
   // Connect tab
-  connectWrap: { padding: "32px 36px", maxWidth: 620 },
+  connectWrap: { padding: "32px 40px 48px", maxWidth: 1400, width: "100%" },
   sectionTitle: {
-    fontSize: 20, fontWeight: 600, color: C.text, margin: "0 0 6px",
+    fontSize: 22, fontWeight: 600, color: C.text, margin: "0 0 6px",
     fontFamily: '"Chakra Petch", sans-serif',
   },
-  sectionSub: { fontSize: 13, color: C.textMuted, margin: "0 0 28px" },
-  accordionList: { display: "flex", flexDirection: "column", gap: 8 },
-  accordion: { borderRadius: 10, overflow: "hidden" },
-  accordionHeader: {
+  sectionSub: { fontSize: 14, color: C.textMuted, margin: "0 0 24px" },
+
+  // Help banner (top of Connect tab)
+  helpBanner: {
+    display: "flex", alignItems: "center", justifyContent: "space-between",
+    gap: 16, padding: "16px 20px", marginBottom: 28,
+    background: `linear-gradient(135deg, ${C.accentGlow}, ${C.bg2})`,
+    border: `1px solid ${C.borderLight}`, borderRadius: 12,
+    textDecoration: "none", color: C.text, cursor: "pointer",
+    transition: "all 0.15s",
+  },
+  helpBannerLeft: { display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 },
+  helpBannerIcon: {
+    width: 40, height: 40, minWidth: 40, borderRadius: 10,
+    background: C.accentGlowStrong, color: C.accentBright,
+    display: "flex", alignItems: "center", justifyContent: "center",
+  },
+  helpBannerTitle: {
+    fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 2,
+    fontFamily: '"Chakra Petch", sans-serif',
+  },
+  helpBannerSub: { fontSize: 13, color: C.textDim, lineHeight: 1.5 },
+  helpBannerName: { color: C.accent, fontWeight: 600 },
+  helpBannerCta: {
+    padding: "10px 16px", background: C.accent, color: "#0e1010",
+    fontWeight: 600, fontSize: 13, borderRadius: 8, whiteSpace: "nowrap",
+    fontFamily: '"Chakra Petch", sans-serif',
+  },
+
+  // Card grid (2x3, with media-query collapse handled by injected stylesheet)
+  cardGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 20,
+    alignItems: "start",
+  },
+  connCard: {
+    background: C.bg1, border: `1px solid ${C.border}`, borderRadius: 12,
+    overflow: "hidden", display: "flex", flexDirection: "column",
+  },
+  cardHeader: {
     width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-    padding: "14px 16px", border: `1px solid ${C.border}`, borderRadius: 10,
+    padding: "18px 20px", border: "none", borderBottom: `1px solid transparent`,
     cursor: "pointer", fontFamily: '"Chakra Petch", sans-serif', color: C.text,
-    transition: "all 0.15s",
+    transition: "all 0.15s", textAlign: "left",
   },
-  accordionTitle: { fontSize: 14, fontWeight: 600, marginRight: 8 },
-  accordionDesc: { fontSize: 11, color: C.textMuted },
-  accordionChevron: { fontSize: 14, color: C.textMuted, transition: "transform 0.2s" },
-  accordionBody: {
-    padding: "12px 16px 16px", background: C.bg2,
-    borderLeft: `1px solid ${C.border}`, borderRight: `1px solid ${C.border}`,
-    borderBottom: `1px solid ${C.border}`, borderRadius: "0 0 10px 10px",
-    marginTop: -2,
+  cardHeaderText: { display: "flex", flexDirection: "column", gap: 2 },
+  cardTitle: { fontSize: 17, fontWeight: 600, color: C.text },
+  cardPlatform: { fontSize: 12, color: C.textMuted },
+  cardChevron: {
+    fontSize: 16, color: C.textMuted, transition: "transform 0.2s", marginLeft: 12,
   },
-  connectContent: { display: "flex", flexDirection: "column", gap: 8 },
-  connectP: { fontSize: 12, color: C.textDim, margin: 0, lineHeight: 1.6 },
-  connectCopy: {
-    padding: "10px 14px", background: C.bg3, border: `1px solid ${C.borderLight}`,
-    borderRadius: 8, color: C.accent, cursor: "pointer",
-    fontFamily: '"JetBrains Mono", monospace', fontSize: 12, textAlign: "left",
-    transition: "all 0.15s",
+  cardBody: {
+    padding: "20px 24px 24px", background: C.bg2,
+    borderTop: `1px solid ${C.border}`,
   },
-  connectNote: { fontSize: 10, color: C.textMuted, margin: 0, lineHeight: 1.5 },
-  step: {
-    display: "flex", alignItems: "flex-start", gap: 10, fontSize: 12,
-    color: C.textDim, margin: 0, lineHeight: 1.6,
+  cardEmpty: {
+    // The intentionally-empty 6th cell. Kept invisible but reserves grid space.
+    minHeight: 1,
   },
+
+  // Card content
+  cardContent: { display: "flex", flexDirection: "column", gap: 18 },
+  cardIntro: {
+    fontSize: 13, color: C.textDim, lineHeight: 1.6, margin: 0,
+    padding: "10px 14px", background: C.bg1, borderRadius: 8,
+    borderLeft: `3px solid ${C.accentDim}`,
+  },
+  cardTip: {
+    fontSize: 12, color: C.textDim, lineHeight: 1.6, margin: 0,
+    padding: "10px 14px", background: C.bg1, borderRadius: 8,
+    borderLeft: `3px solid ${C.sleeping}`,
+  },
+
+  // Numbered steps
+  step: { display: "flex", alignItems: "flex-start", gap: 14 },
   stepNum: {
-    display: "inline-flex", alignItems: "center", justifyContent: "center",
-    width: 20, height: 20, minWidth: 20, borderRadius: 6,
-    background: C.bg3, color: C.accent, fontSize: 10, fontWeight: 600,
+    display: "flex", alignItems: "center", justifyContent: "center",
+    width: 28, height: 28, minWidth: 28, borderRadius: 8,
+    background: C.bg3, color: C.accent, fontSize: 13, fontWeight: 700,
+    fontFamily: '"Chakra Petch", sans-serif', marginTop: 1,
   },
-  code: {
-    padding: "1px 6px", background: `${C.accent}15`, border: `1px solid ${C.accent}30`,
-    borderRadius: 4, color: C.accent, fontFamily: '"JetBrains Mono", monospace', fontSize: 11,
+  stepBody: {
+    flex: 1, fontSize: 14, color: C.text, lineHeight: 1.65,
+    display: "flex", flexDirection: "column", gap: 10,
+  },
+
+  // Inline value chip (for button names, DNS values shown inline)
+  valChip: {
+    display: "inline-block", padding: "1px 7px", margin: "0 2px",
+    background: `${C.accent}18`, border: `1px solid ${C.accent}35`,
+    borderRadius: 5, color: C.accentBright,
+    fontFamily: '"JetBrains Mono", monospace', fontSize: 12.5,
+    whiteSpace: "nowrap",
+  },
+
+  // Address chip — prominent click-to-copy block under a step
+  addrChip: {
+    display: "flex", alignItems: "center", justifyContent: "space-between",
+    width: "100%", padding: "12px 16px", marginTop: 2,
+    background: C.bg3, border: `1px solid ${C.borderLight}`, borderRadius: 8,
+    color: C.accent, cursor: "pointer",
+    fontFamily: '"JetBrains Mono", monospace', fontSize: 13,
+    textAlign: "left", transition: "all 0.15s",
+  },
+  addrChipText: { flex: 1, wordBreak: "break-all" },
+  addrChipCopy: {
+    fontSize: 11, color: C.textMuted, marginLeft: 12, fontWeight: 500,
+    fontFamily: '"Chakra Petch", sans-serif', letterSpacing: 0.5,
+    textTransform: "uppercase", whiteSpace: "nowrap",
+  },
+
+  // "Why all these steps?" footer on console cards
+  consoleFooter: {
+    marginTop: 6, padding: "12px 14px", background: C.bg1,
+    border: `1px solid ${C.border}`, borderRadius: 8,
+    fontSize: 12, color: C.textDim, lineHeight: 1.6,
+    display: "flex", flexDirection: "column", gap: 4,
+  },
+  consoleFooterTitle: {
+    fontSize: 12, color: C.text, fontWeight: 600,
+    fontFamily: '"Chakra Petch", sans-serif',
   },
   // Playground
   playWrap: { padding: "32px 36px", display: "flex", flexDirection: "column", flex: 1 },
