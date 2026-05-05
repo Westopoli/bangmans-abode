@@ -1,0 +1,39 @@
+name: Poll server status
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # every 5 min (GitHub may delay during high load — that's fine)
+  workflow_dispatch:         # lets you run it manually from the Actions tab
+
+permissions:
+  contents: write            # needed to commit the data files back
+
+# If a run is still going when the next one fires, skip the new one.
+concurrency:
+  group: poll-status
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Poll mcsrvstat.us and update data files
+        run: node scripts/poll-status.mjs
+
+      - name: Commit if changed
+        run: |
+          git config user.name  "bangman-bot"
+          git config user.email "bot@bangmansabode.local"
+          if [[ -n "$(git status --porcelain data/)" ]]; then
+            git add data/
+            git commit -m "data: poll @ $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push
+          else
+            echo "No data changes; skipping commit."
+          fi
