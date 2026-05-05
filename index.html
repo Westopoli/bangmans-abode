@@ -19,6 +19,9 @@
       .connect-grid .empty-cell {
         display: none !important;
       }
+      .logbook-grid {
+        grid-template-columns: 1fr !important;
+      }
     }
 
     /* Hover states for elements that can't easily do it inline */
@@ -166,6 +169,13 @@ const Icons = {
       <path d="M6 6l12 12M18 6L6 18" />
     </svg>
   ),
+  logbook: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 4h12a3 3 0 013 3v13a1 1 0 01-1 1H7a3 3 0 01-3-3z" />
+      <path d="M4 17a3 3 0 013-3h12" />
+      <path d="M8 8h7M8 12h5" />
+    </svg>
+  ),
 };
 
 // ─── MAP MODE DESCRIPTIONS (shared by Home guide + first-visit overlay) ─
@@ -184,6 +194,7 @@ function Sidebar({ active, onChange }) {
     { id: "home", icon: Icons.home, label: "Home" },
     { id: "map", icon: Icons.map, label: "Map" },
     { id: "connect", icon: Icons.connect, label: "Connect" },
+    { id: "logbook", icon: Icons.logbook, label: "Logbook" },
     { id: "dad", icon: Icons.dad, label: "Dad" },
   ];
   return (
@@ -650,6 +661,309 @@ function ConnectTab() {
   );
 }
 
+// ─── LOGBOOK TAB ──────────────────────────────────────────────────────
+// Reads ./data/playtime-summary.json (already fetched at the Dashboard level
+// and passed in as `summary`). Four sections: currently online, leaderboard,
+// activity bars, last seen. All-empty case handled gracefully — the poller
+// might not have run yet, or no one has played yet.
+function LogbookTab({ summary }) {
+  // Sort key for the leaderboard: "minutes" | "sessions" | "longest"
+  const [sortKey, setSortKey] = useState("minutes");
+
+  // Loading state: Dashboard sets summary=null until first fetch completes.
+  if (summary === null) {
+    return (
+      <div style={S.logWrap}>
+        <h2 style={S.sectionTitle}>Logbook</h2>
+        <p style={S.sectionSub}>Loading the receipts...</p>
+      </div>
+    );
+  }
+
+  // Hard empty state: the poller has never produced a summary file (404).
+  // Different from "summary exists but no players yet" which we handle below.
+  // We can't perfectly distinguish these — Dashboard's fetch silently swallows
+  // the 404 leaving summary=null forever, so by the time we get here `summary`
+  // is at least an object. But just in case it's a literal empty object:
+  if (!summary || typeof summary !== "object") {
+    return (
+      <div style={S.logWrap}>
+        <h2 style={S.sectionTitle}>Logbook</h2>
+        <p style={S.sectionSub}>
+          No stats yet. The poller runs every 5 minutes — check back soon.
+        </p>
+      </div>
+    );
+  }
+
+  const nowOnline = summary.now_online || [];
+  const totals = summary.totals || {};
+  const lastSeen = summary.last_seen || {};
+  const byHour = summary.activity_by_hour || new Array(24).fill(0);
+  const byDow = summary.activity_by_dow || new Array(7).fill(0);
+  const everyoneEver = Object.keys(totals);
+
+  // Build the leaderboard rows. Always derive from `totals` (richer than the
+  // pre-sorted `leaderboard` field) so we can sort by sessions / longest too.
+  const rows = everyoneEver.map((name) => ({
+    name,
+    minutes: totals[name].minutes || 0,
+    sessions: totals[name].sessions || 0,
+    longest: totals[name].longest_session_min || 0,
+  }));
+  rows.sort((a, b) => {
+    if (sortKey === "minutes") return b.minutes - a.minutes;
+    if (sortKey === "sessions") return b.sessions - a.sessions;
+    return b.longest - a.longest;
+  });
+
+  // Last seen, sorted most-recent-first. ISO strings sort correctly as strings.
+  const lastSeenRows = Object.entries(lastSeen)
+    .map(([name, iso]) => ({ name, iso }))
+    .sort((a, b) => b.iso.localeCompare(a.iso));
+
+  // Format minutes as "1h 23m" / "23m" / "<1m". 0 minutes for someone who's
+  // been seen only once is real — a single sample can't accumulate any time
+  // until a second poll catches them still online.
+  const fmtMin = (m) => {
+    if (m < 1) return "<1m";
+    if (m < 60) return `${Math.round(m)}m`;
+    const h = Math.floor(m / 60);
+    const r = Math.round(m - h * 60);
+    return r === 0 ? `${h}h` : `${h}h ${r}m`;
+  };
+
+  // Dashboard sort headers: clicking re-sorts. Active key gets the green pill.
+  const SortHeader = ({ k, label, align = "right" }) => (
+    <button
+      onClick={() => setSortKey(k)}
+      style={{
+        ...S.logSortBtn,
+        color: sortKey === k ? C.accent : C.textMuted,
+        background: sortKey === k ? C.accentGlow : "transparent",
+        textAlign: align,
+      }}
+    >
+      {label}
+      {sortKey === k && <span style={S.logSortArrow}>↓</span>}
+    </button>
+  );
+
+  return (
+    <div style={S.logWrap}>
+      <h2 style={S.sectionTitle}>Logbook</h2>
+      <p style={S.sectionSub}>Receipts from the server</p>
+
+      {/* ─── Section 1: Currently online (full-width banner) ─── */}
+      <section style={S.logOnlineBanner}>
+        <div style={S.logOnlineHead}>
+          <span style={S.logOnlineDot} />
+          <span style={S.logOnlineLabel}>Currently online</span>
+          <span style={S.logOnlineCount}>
+            {nowOnline.length} {nowOnline.length === 1 ? "player" : "players"}
+          </span>
+        </div>
+        {nowOnline.length > 0 ? (
+          <div style={S.logOnlineList}>
+            {nowOnline.map((name) => (
+              <div key={name} style={S.logOnlineChip}>
+                <img
+                  src={`https://mc-heads.net/avatar/${name}/32`}
+                  alt=""
+                  style={S.logOnlineAvatar}
+                  onError={(e) => { e.target.style.display = "none"; }}
+                />
+                <span style={S.logOnlineName}>{name}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={S.logOnlineEmpty}>
+            <span style={{ fontSize: 22 }}>💤</span>
+            <span>Nobody's on right now. Imagine having friends.</span>
+          </div>
+        )}
+      </section>
+
+      {/* ─── Section 2: Two-column row — leaderboard | activity ─── */}
+      <div className="logbook-grid" style={S.logGrid}>
+        {/* Leaderboard */}
+        <section style={S.logCard}>
+          <div style={S.logCardHead}>
+            <span style={S.logCardTitle}>All-time leaderboard</span>
+            <span style={S.logCardSub}>{rows.length} {rows.length === 1 ? "player tracked" : "players tracked"}</span>
+          </div>
+
+          {rows.length === 0 ? (
+            <div style={S.logCardEmpty}>
+              No one has logged in yet. The board is open.
+            </div>
+          ) : (
+            <>
+              {/* Sort headers row */}
+              <div style={S.logTableHeader}>
+                <span style={{ ...S.logColPlayer, color: C.textMuted, fontSize: 10 }}>
+                  PLAYER
+                </span>
+                <SortHeader k="minutes" label="TIME" />
+                <SortHeader k="sessions" label="SESSIONS" />
+                <SortHeader k="longest" label="LONGEST" />
+              </div>
+
+              {/* Rows */}
+              <div style={S.logTableBody}>
+                {rows.map((r, i) => {
+                  const isOnline = nowOnline.includes(r.name);
+                  return (
+                    <div key={r.name} style={S.logRow}>
+                      <span style={S.logRank}>{i + 1}</span>
+                      <div style={S.logColPlayer}>
+                        <img
+                          src={`https://mc-heads.net/avatar/${r.name}/24`}
+                          alt=""
+                          style={S.logAvatar}
+                          onError={(e) => { e.target.style.display = "none"; }}
+                        />
+                        <span style={{
+                          ...S.logName,
+                          color: isOnline ? C.accent : C.text,
+                        }}>
+                          {r.name}
+                        </span>
+                        {isOnline && <span style={S.logLiveDot} title="Online now" />}
+                      </div>
+                      <span style={{
+                        ...S.logCellNum,
+                        color: sortKey === "minutes" ? C.accent : C.text,
+                      }}>{fmtMin(r.minutes)}</span>
+                      <span style={{
+                        ...S.logCellNum,
+                        color: sortKey === "sessions" ? C.accent : C.text,
+                      }}>{r.sessions}</span>
+                      <span style={{
+                        ...S.logCellNum,
+                        color: sortKey === "longest" ? C.accent : C.text,
+                      }}>{fmtMin(r.longest)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </section>
+
+        {/* Activity (two stacked 1D bar charts) */}
+        <section style={S.logCard}>
+          <div style={S.logCardHead}>
+            <span style={S.logCardTitle}>Activity</span>
+            <span style={S.logCardSub}>When the server actually gets used</span>
+          </div>
+
+          {byHour.every((v) => v === 0) && byDow.every((v) => v === 0) ? (
+            <div style={S.logCardEmpty}>
+              Not enough data to chart. Play more, the bars will fill in.
+            </div>
+          ) : (
+            <div style={S.logActivityWrap}>
+              <ActivityBars
+                title="By hour of day"
+                sub="UTC. Bars are total player-minutes recorded in that hour."
+                data={byHour}
+                labelFor={(i) => (i % 6 === 0 ? `${i.toString().padStart(2, "0")}:00` : "")}
+              />
+              <ActivityBars
+                title="By day of week"
+                sub="Sunday through Saturday."
+                data={byDow}
+                labelFor={(i) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][i]}
+                alwaysLabel
+              />
+            </div>
+          )}
+        </section>
+      </div>
+
+      {/* ─── Section 3: Last seen (full-width strip) ─── */}
+      <section style={S.logLastSeen}>
+        <div style={S.logCardHead}>
+          <span style={S.logCardTitle}>Last seen</span>
+          <span style={S.logCardSub}>The roster, sorted by who showed up most recently</span>
+        </div>
+
+        {lastSeenRows.length === 0 ? (
+          <div style={S.logCardEmpty}>
+            Nobody's ever been online. This is bleak.
+          </div>
+        ) : (
+          <div style={S.logLastSeenList}>
+            {lastSeenRows.map(({ name, iso }) => {
+              const isOnline = nowOnline.includes(name);
+              return (
+                <div key={name} style={S.logLastSeenRow}>
+                  <img
+                    src={`https://mc-heads.net/avatar/${name}/24`}
+                    alt=""
+                    style={S.logAvatar}
+                    onError={(e) => { e.target.style.display = "none"; }}
+                  />
+                  <span style={{
+                    ...S.logName,
+                    color: isOnline ? C.accent : C.text,
+                  }}>
+                    {name}
+                  </span>
+                  <span style={S.logLastSeenWhen}>
+                    {isOnline ? "online now" : timeAgo(iso) || "—"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+// ─── ACTIVITY BARS (used inside Logbook) ──────────────────────────────
+// Renders a small 1D bar chart from a numeric array. Bar height is scaled
+// to the array's max so a quiet week and a heavy week both look readable.
+function ActivityBars({ title, sub, data, labelFor, alwaysLabel = false }) {
+  const max = Math.max(1, ...data); // avoid /0; if all zero, bars all show as min
+  return (
+    <div style={S.logBarsBlock}>
+      <div style={S.logBarsHead}>
+        <span style={S.logBarsTitle}>{title}</span>
+        <span style={S.logBarsSub}>{sub}</span>
+      </div>
+      <div style={S.logBarsRow}>
+        {data.map((v, i) => {
+          const pct = (v / max) * 100;
+          // A floor of 4% so empty hours still show a faint baseline tick —
+          // makes the chart shape readable instead of a row of nothing.
+          const h = v === 0 ? 4 : Math.max(8, pct);
+          return (
+            <div key={i} style={S.logBarCol} title={`${labelFor(i) || i}: ${Math.round(v)} player-minutes`}>
+              <div style={{
+                ...S.logBar,
+                height: `${h}%`,
+                background: v === 0 ? C.bg3 : C.accent,
+                opacity: v === 0 ? 0.5 : 0.4 + 0.6 * (pct / 100),
+              }} />
+              <span style={{
+                ...S.logBarLabel,
+                visibility: alwaysLabel || labelFor(i) ? "visible" : "hidden",
+              }}>
+                {labelFor(i) || i}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── MAP CONTROLS GUIDE (Home reference card) ─────────────────────────
 function MapControlsGuide() {
   return (
@@ -812,6 +1126,7 @@ function Dashboard() {
           )}
           {tab === "map" && <MapSection status={status} fullscreen />}
           {tab === "connect" && <ConnectTab />}
+          {tab === "logbook" && <LogbookTab summary={summary} />}
           {tab === "dad" && (
             <div style={S.dadWrap}>
               <img src={DAD_IMG} alt="Dad" style={S.dadImg} />
@@ -1200,6 +1515,180 @@ const S = {
     border: "none", borderRadius: 8, fontWeight: 600, fontSize: 13,
     fontFamily: '"Chakra Petch", sans-serif', cursor: "pointer",
     letterSpacing: 0.3,
+  },
+
+  // ─── Logbook tab ─────────────────────────────────────────────────────
+  logWrap: {
+    padding: "32px 40px 48px", maxWidth: 1400, width: "100%",
+    margin: "0 auto",
+    display: "flex", flexDirection: "column", gap: 20,
+  },
+
+  // Section 1: Currently online banner
+  logOnlineBanner: {
+    background: `linear-gradient(135deg, ${C.accentGlow}, ${C.bg2})`,
+    border: `1px solid ${C.borderLight}`, borderRadius: 14,
+    padding: "20px 24px",
+    display: "flex", flexDirection: "column", gap: 14,
+  },
+  logOnlineHead: { display: "flex", alignItems: "center", gap: 10 },
+  logOnlineDot: {
+    width: 10, height: 10, borderRadius: "50%", background: C.online,
+    boxShadow: `0 0 10px ${C.online}80`,
+  },
+  logOnlineLabel: {
+    fontSize: 14, fontWeight: 600, color: C.text, letterSpacing: 0.3,
+    fontFamily: '"Chakra Petch", sans-serif',
+  },
+  logOnlineCount: {
+    fontSize: 12, color: C.textMuted, marginLeft: "auto",
+    fontFamily: '"JetBrains Mono", monospace',
+  },
+  logOnlineList: {
+    display: "flex", flexWrap: "wrap", gap: 10,
+  },
+  logOnlineChip: {
+    display: "flex", alignItems: "center", gap: 10,
+    padding: "8px 14px 8px 8px", background: C.bg3,
+    border: `1px solid ${C.borderLight}`, borderRadius: 999,
+  },
+  logOnlineAvatar: {
+    width: 28, height: 28, borderRadius: 6, imageRendering: "pixelated",
+  },
+  logOnlineName: {
+    fontSize: 14, fontWeight: 600, color: C.accent,
+  },
+  logOnlineEmpty: {
+    display: "flex", alignItems: "center", gap: 12,
+    padding: "8px 4px", fontSize: 13, color: C.textDim,
+  },
+
+  // Section 2: 2-column grid (leaderboard | activity)
+  logGrid: {
+    display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20,
+    alignItems: "start",
+  },
+  logCard: {
+    background: C.bg2, border: `1px solid ${C.border}`, borderRadius: 14,
+    padding: "18px 20px 20px",
+    display: "flex", flexDirection: "column", gap: 14,
+  },
+  logCardHead: {
+    display: "flex", flexDirection: "column", gap: 2,
+    paddingBottom: 12, borderBottom: `1px solid ${C.border}`,
+  },
+  logCardTitle: {
+    fontSize: 15, fontWeight: 600, color: C.text,
+    fontFamily: '"Chakra Petch", sans-serif',
+  },
+  logCardSub: { fontSize: 12, color: C.textMuted, lineHeight: 1.4 },
+  logCardEmpty: {
+    padding: "32px 12px", textAlign: "center",
+    fontSize: 13, color: C.textDim, lineHeight: 1.5,
+    background: C.bg1, border: `1px dashed ${C.border}`, borderRadius: 10,
+  },
+
+  // Leaderboard table
+  logTableHeader: {
+    display: "grid",
+    gridTemplateColumns: "26px minmax(0, 1fr) 70px 80px 80px",
+    alignItems: "center", gap: 8,
+    padding: "0 4px 6px",
+    borderBottom: `1px solid ${C.border}`,
+  },
+  logSortBtn: {
+    fontSize: 10, fontWeight: 700, letterSpacing: 1,
+    fontFamily: '"Chakra Petch", sans-serif',
+    border: "none", padding: "4px 8px", borderRadius: 6,
+    cursor: "pointer", transition: "all 0.15s",
+    display: "inline-flex", alignItems: "center", justifyContent: "flex-end",
+    gap: 4,
+  },
+  logSortArrow: { fontSize: 9, lineHeight: 1 },
+  logTableBody: {
+    display: "flex", flexDirection: "column", gap: 2,
+  },
+  logRow: {
+    display: "grid",
+    gridTemplateColumns: "26px minmax(0, 1fr) 70px 80px 80px",
+    alignItems: "center", gap: 8,
+    padding: "8px 4px",
+    borderRadius: 8, transition: "background 0.15s",
+  },
+  logRank: {
+    fontSize: 11, color: C.textMuted, fontWeight: 600,
+    fontFamily: '"JetBrains Mono", monospace', textAlign: "center",
+  },
+  logColPlayer: {
+    display: "flex", alignItems: "center", gap: 8, minWidth: 0,
+  },
+  logAvatar: {
+    width: 22, height: 22, borderRadius: 4, imageRendering: "pixelated",
+    flexShrink: 0,
+  },
+  logName: {
+    fontSize: 13, fontWeight: 500,
+    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+  },
+  logLiveDot: {
+    width: 6, height: 6, borderRadius: "50%", background: C.online,
+    boxShadow: `0 0 6px ${C.online}`, flexShrink: 0,
+  },
+  logCellNum: {
+    fontSize: 13, fontWeight: 500, textAlign: "right",
+    fontFamily: '"JetBrains Mono", monospace',
+  },
+
+  // Activity (two stacked bar blocks)
+  logActivityWrap: { display: "flex", flexDirection: "column", gap: 18 },
+  logBarsBlock: { display: "flex", flexDirection: "column", gap: 8 },
+  logBarsHead: { display: "flex", flexDirection: "column", gap: 2 },
+  logBarsTitle: {
+    fontSize: 12, fontWeight: 600, color: C.text, letterSpacing: 0.3,
+    fontFamily: '"Chakra Petch", sans-serif',
+  },
+  logBarsSub: { fontSize: 11, color: C.textMuted, lineHeight: 1.4 },
+  logBarsRow: {
+    display: "flex", alignItems: "flex-end", gap: 3,
+    height: 90, paddingTop: 8,
+    borderBottom: `1px solid ${C.border}`,
+    paddingBottom: 4,
+  },
+  logBarCol: {
+    flex: 1, minWidth: 0,
+    display: "flex", flexDirection: "column", alignItems: "center",
+    justifyContent: "flex-end", gap: 4,
+    height: "100%",
+  },
+  logBar: {
+    width: "100%", borderRadius: "3px 3px 0 0",
+    transition: "height 0.2s",
+  },
+  logBarLabel: {
+    fontSize: 9, color: C.textMuted, marginTop: 4,
+    fontFamily: '"JetBrains Mono", monospace',
+    height: 11, // reserve space so hidden labels don't shift bar height
+  },
+
+  // Section 3: Last seen strip
+  logLastSeen: {
+    background: C.bg2, border: `1px solid ${C.border}`, borderRadius: 14,
+    padding: "18px 20px 20px",
+    display: "flex", flexDirection: "column", gap: 14,
+  },
+  logLastSeenList: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+    gap: 8,
+  },
+  logLastSeenRow: {
+    display: "flex", alignItems: "center", gap: 10,
+    padding: "8px 12px",
+    background: C.bg1, border: `1px solid ${C.border}`, borderRadius: 8,
+  },
+  logLastSeenWhen: {
+    fontSize: 11, color: C.textMuted, marginLeft: "auto",
+    fontFamily: '"JetBrains Mono", monospace',
   },
 };
 
