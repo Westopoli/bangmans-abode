@@ -22,6 +22,9 @@
       .logbook-grid {
         grid-template-columns: 1fr !important;
       }
+      .pulse-grid {
+        grid-template-columns: 1fr !important;
+      }
     }
 
     /* Hover states for elements that can't easily do it inline */
@@ -35,6 +38,10 @@
     }
     .card-header:hover {
       background: #282a2e !important;
+    }
+    .pulse-view-btn:hover {
+      background: #282a2e !important;
+      color: #6fcf6f !important;
     }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
@@ -79,6 +86,15 @@ function timeAgo(iso) {
   if (diffSec < 86400) return `${Math.round(diffSec / 3600)}h ago`;
   if (diffSec < 172800) return "yesterday";
   return `${Math.round(diffSec / 86400)}d ago`;
+}
+
+// Format minutes as "4h 12m" / "42m" / "<1m". Used by ServerPulse and Logbook.
+function fmtDur(m) {
+  if (m < 1) return "<1m";
+  if (m < 60) return `${Math.round(m)}m`;
+  const h = Math.floor(m / 60);
+  const r = Math.round(m - h * 60);
+  return r === 0 ? `${h}h` : `${h}h ${r}m`;
 }
 
 // ─── PALETTE ──────────────────────────────────────────────────────────
@@ -661,6 +677,169 @@ function ConnectTab() {
   );
 }
 
+// ─── SERVER PULSE (Home strip) ────────────────────────────────────────
+// Compact 3-column dashboard for the Home tab. Mirrors a slice of Logbook
+// but tuned for "glance and go" — currently online, all-time top 3, and a
+// rotating highlight stat that picks the most evocative fact from the data.
+function ServerPulse({ summary, onViewLogbook }) {
+  // Loading or no-data state — render nothing rather than a placeholder block
+  // that would push the map down for no reason. The map is the load-bearing
+  // element of the home page, this strip is supplementary.
+  if (!summary || typeof summary !== "object") return null;
+
+  const nowOnline = summary.now_online || [];
+  const totals = summary.totals || {};
+  const byHour = summary.activity_by_hour || new Array(24).fill(0);
+
+  // Top-3 all-time leaderboard, derived from totals (richer than the
+  // pre-sorted `leaderboard` field — but they should agree).
+  const top3 = Object.entries(totals)
+    .map(([name, v]) => ({ name, minutes: v.minutes || 0 }))
+    .sort((a, b) => b.minutes - a.minutes)
+    .slice(0, 3);
+
+  // ─── Highlight stat picker ──────────────────────────────────────────
+  // Priority order: big session > active week > clear peak hour >
+  // lifetime milestone > cold start. Returns { label, value, sub }.
+  // Each branch picks the *most evocative* fact available given current data.
+  const highlight = (() => {
+    // 1. Notable single session (>2hr)
+    let bestSess = { name: null, mins: 0 };
+    for (const [name, v] of Object.entries(totals)) {
+      if ((v.longest_session_min || 0) > bestSess.mins) {
+        bestSess = { name, mins: v.longest_session_min };
+      }
+    }
+    if (bestSess.mins >= 120) {
+      return {
+        label: "Longest session",
+        value: fmtDur(bestSess.mins),
+        sub: `by ${bestSess.name}`,
+      };
+    }
+
+    // 2. Active week — total minutes this week across everyone
+    const thisWeek = summary.this_week || {};
+    const weekMin = Object.values(thisWeek).reduce((a, v) => a + (v.minutes || 0), 0);
+    if (weekMin >= 60) {
+      return {
+        label: "This week",
+        value: fmtDur(weekMin),
+        sub: "played across the server",
+      };
+    }
+
+    // 3. Clear peak hour (one hour is >2× the 24-hour average)
+    const hourSum = byHour.reduce((a, v) => a + v, 0);
+    if (hourSum > 0) {
+      const avg = hourSum / 24;
+      let peakHour = 0, peakVal = 0;
+      for (let i = 0; i < 24; i++) {
+        if (byHour[i] > peakVal) { peakVal = byHour[i]; peakHour = i; }
+      }
+      if (peakVal >= avg * 2 && peakVal >= 10) {
+        return {
+          label: "Busiest hour",
+          value: `${peakHour.toString().padStart(2, "0")}:00 UTC`,
+          sub: "when the server lights up",
+        };
+      }
+    }
+
+    // 4. Lifetime milestone (>10hr total across everyone)
+    const lifetimeMin = Object.values(totals).reduce((a, v) => a + (v.minutes || 0), 0);
+    if (lifetimeMin >= 600) {
+      return {
+        label: "Total played",
+        value: fmtDur(lifetimeMin),
+        sub: "logged so far",
+      };
+    }
+
+    // 5. Cold start — count tracked players, even if minutes are zero
+    const trackedCount = Object.keys(totals).length;
+    return {
+      label: "Just getting started",
+      value: trackedCount > 0 ? `${trackedCount}` : "0",
+      sub: trackedCount === 1 ? "player tracked" : "players tracked",
+    };
+  })();
+
+  return (
+    <div style={S.pulseWrap}>
+      <div className="pulse-grid" style={S.pulseGrid}>
+
+        {/* Column 1: Currently online */}
+        <div style={S.pulseCol}>
+          <div style={S.pulseLabel}>Online now</div>
+          {nowOnline.length > 0 ? (
+            <div style={S.pulseOnlineList}>
+              {nowOnline.slice(0, 4).map((name) => (
+                <div key={name} style={S.pulseOnlineRow}>
+                  <img
+                    src={`https://mc-heads.net/avatar/${name}/24`}
+                    alt=""
+                    style={S.pulseAvatar}
+                    onError={(e) => { e.target.style.display = "none"; }}
+                  />
+                  <span style={S.pulseOnlineName}>{name}</span>
+                </div>
+              ))}
+              {nowOnline.length > 4 && (
+                <div style={S.pulseOnlineMore}>+{nowOnline.length - 4} more</div>
+              )}
+            </div>
+          ) : (
+            <div style={S.pulseEmpty}>
+              <span style={{ fontSize: 18 }}>💤</span>
+              <span>Empty</span>
+            </div>
+          )}
+        </div>
+
+        {/* Column 2: All-time top 3 */}
+        <div style={S.pulseCol}>
+          <div style={S.pulseLabel}>Top 3 all-time</div>
+          {top3.length > 0 && top3[0].minutes > 0 ? (
+            <div style={S.pulseTopList}>
+              {top3.map((p, i) => (
+                <div key={p.name} style={S.pulseTopRow}>
+                  <span style={S.pulseRank}>#{i + 1}</span>
+                  <img
+                    src={`https://mc-heads.net/avatar/${p.name}/20`}
+                    alt=""
+                    style={S.pulseAvatar}
+                    onError={(e) => { e.target.style.display = "none"; }}
+                  />
+                  <span style={S.pulseTopName}>{p.name}</span>
+                  <span style={S.pulseTopTime}>{fmtDur(p.minutes)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={S.pulseEmpty}>
+              <span>No leader yet</span>
+            </div>
+          )}
+        </div>
+
+        {/* Column 3: Rotating highlight stat */}
+        <div style={S.pulseCol}>
+          <div style={S.pulseLabel}>{highlight.label}</div>
+          <div style={S.pulseHighlightValue}>{highlight.value}</div>
+          <div style={S.pulseHighlightSub}>{highlight.sub}</div>
+        </div>
+      </div>
+
+      {/* View Logbook footer */}
+      <button onClick={onViewLogbook} style={S.pulseViewBtn} className="pulse-view-btn">
+        <span>View Logbook</span>
+        <span style={S.pulseViewArrow}>→</span>
+      </button>
+    </div>
+  );
+}
+
 // ─── LOGBOOK TAB ──────────────────────────────────────────────────────
 // Reads ./data/playtime-summary.json (already fetched at the Dashboard level
 // and passed in as `summary`). Four sections: currently online, leaderboard,
@@ -721,17 +900,6 @@ function LogbookTab({ summary }) {
   const lastSeenRows = Object.entries(lastSeen)
     .map(([name, iso]) => ({ name, iso }))
     .sort((a, b) => b.iso.localeCompare(a.iso));
-
-  // Format minutes as "1h 23m" / "23m" / "<1m". 0 minutes for someone who's
-  // been seen only once is real — a single sample can't accumulate any time
-  // until a second poll catches them still online.
-  const fmtMin = (m) => {
-    if (m < 1) return "<1m";
-    if (m < 60) return `${Math.round(m)}m`;
-    const h = Math.floor(m / 60);
-    const r = Math.round(m - h * 60);
-    return r === 0 ? `${h}h` : `${h}h ${r}m`;
-  };
 
   // Dashboard sort headers: clicking re-sorts. Active key gets the green pill.
   const SortHeader = ({ k, label, align = "right" }) => (
@@ -835,7 +1003,7 @@ function LogbookTab({ summary }) {
                       <span style={{
                         ...S.logCellNum,
                         color: sortKey === "minutes" ? C.accent : C.text,
-                      }}>{fmtMin(r.minutes)}</span>
+                      }}>{fmtDur(r.minutes)}</span>
                       <span style={{
                         ...S.logCellNum,
                         color: sortKey === "sessions" ? C.accent : C.text,
@@ -843,7 +1011,7 @@ function LogbookTab({ summary }) {
                       <span style={{
                         ...S.logCellNum,
                         color: sortKey === "longest" ? C.accent : C.text,
-                      }}>{fmtMin(r.longest)}</span>
+                      }}>{fmtDur(r.longest)}</span>
                     </div>
                   );
                 })}
@@ -1120,6 +1288,7 @@ function Dashboard() {
                 </div>
                 <span style={S.ctaArrow}>→</span>
               </div>
+              <ServerPulse summary={summary} onViewLogbook={() => setTab("logbook")} />
               <MapControlsGuide />
               <MapSection status={status} />
             </>
@@ -1515,6 +1684,101 @@ const S = {
     border: "none", borderRadius: 8, fontWeight: 600, fontSize: 13,
     fontFamily: '"Chakra Petch", sans-serif', cursor: "pointer",
     letterSpacing: 0.3,
+  },
+
+  // ─── Server Pulse (Home strip) ───────────────────────────────────────
+  pulseWrap: {
+    margin: "22px 28px 0",
+    background: C.bg2,
+    border: `1px solid ${C.border}`,
+    borderRadius: 14,
+    overflow: "hidden",
+    display: "flex", flexDirection: "column",
+  },
+  pulseGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr 1fr",
+    // Vertical lines between columns via column gap + col borders below.
+  },
+  pulseCol: {
+    padding: "20px 24px",
+    display: "flex", flexDirection: "column", gap: 12,
+    borderRight: `1px solid ${C.border}`,
+    minHeight: 130,
+  },
+  pulseLabel: {
+    fontSize: 9, fontWeight: 700, letterSpacing: 1.2,
+    color: C.textMuted, textTransform: "uppercase",
+    fontFamily: '"Chakra Petch", sans-serif',
+  },
+
+  // Currently online column
+  pulseOnlineList: { display: "flex", flexDirection: "column", gap: 6 },
+  pulseOnlineRow: { display: "flex", alignItems: "center", gap: 8 },
+  pulseAvatar: {
+    width: 22, height: 22, borderRadius: 4,
+    imageRendering: "pixelated", flexShrink: 0,
+  },
+  pulseOnlineName: {
+    fontSize: 13, fontWeight: 600, color: C.accent,
+    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+  },
+  pulseOnlineMore: {
+    fontSize: 11, color: C.textMuted, marginTop: 2,
+    fontFamily: '"JetBrains Mono", monospace',
+  },
+
+  // Top 3 column
+  pulseTopList: { display: "flex", flexDirection: "column", gap: 8 },
+  pulseTopRow: {
+    display: "flex", alignItems: "center", gap: 8,
+  },
+  pulseRank: {
+    fontSize: 11, fontWeight: 700, color: C.textMuted,
+    fontFamily: '"JetBrains Mono", monospace',
+    width: 22, flexShrink: 0,
+  },
+  pulseTopName: {
+    flex: 1, fontSize: 13, fontWeight: 500, color: C.text,
+    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+  },
+  pulseTopTime: {
+    fontSize: 12, fontWeight: 600, color: C.accent,
+    fontFamily: '"JetBrains Mono", monospace', flexShrink: 0,
+  },
+
+  // Highlight stat column — punchy, deliberately bigger than its neighbors
+  pulseHighlightValue: {
+    fontSize: 26, fontWeight: 700, color: C.accentBright,
+    fontFamily: '"Chakra Petch", sans-serif',
+    letterSpacing: 0.3, lineHeight: 1.1,
+  },
+  pulseHighlightSub: {
+    fontSize: 12, color: C.textDim, lineHeight: 1.4,
+  },
+
+  pulseEmpty: {
+    display: "flex", alignItems: "center", gap: 8,
+    fontSize: 13, color: C.textDim,
+  },
+
+  // Footer button — full-width, subtle, the rare button we make a bit
+  // bigger than the body text so it doesn't get lost in the strip.
+  pulseViewBtn: {
+    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+    padding: "12px 20px",
+    background: C.bg1,
+    border: "none",
+    borderTop: `1px solid ${C.border}`,
+    color: C.accent,
+    fontSize: 13, fontWeight: 600,
+    fontFamily: '"Chakra Petch", sans-serif',
+    letterSpacing: 0.5,
+    cursor: "pointer",
+    transition: "all 0.15s",
+  },
+  pulseViewArrow: {
+    fontSize: 16, lineHeight: 1, fontWeight: 300,
   },
 
   // ─── Logbook tab ─────────────────────────────────────────────────────
