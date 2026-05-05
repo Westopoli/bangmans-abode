@@ -61,6 +61,23 @@ fl.href = "https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;60
 fl.rel = "stylesheet";
 document.head.appendChild(fl);
 
+// ─── HELPERS ──────────────────────────────────────────────────────────
+// Format an ISO timestamp as "3m ago", "2h ago", "yesterday", etc.
+// Returns null if the input is missing/invalid so the caller can hide the UI.
+function timeAgo(iso) {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return null;
+  const diffSec = (Date.now() - t) / 1000;
+  if (diffSec < 30)   return "just now";
+  if (diffSec < 90)   return "1m ago";
+  if (diffSec < 3600) return `${Math.round(diffSec / 60)}m ago`;
+  if (diffSec < 7200) return "1h ago";
+  if (diffSec < 86400) return `${Math.round(diffSec / 3600)}h ago`;
+  if (diffSec < 172800) return "yesterday";
+  return `${Math.round(diffSec / 86400)}d ago`;
+}
+
 // ─── PALETTE ──────────────────────────────────────────────────────────
 const C = {
   bg0: "#111214",       // deepest background
@@ -199,16 +216,24 @@ function Sidebar({ active, onChange }) {
 }
 
 // ─── TOP BAR ──────────────────────────────────────────────────────────
-function TopBar({ status, onRefresh }) {
+function TopBar({ status, summary, onRefresh }) {
   const [copied, setCopied] = useState(null);
+  const [tick, setTick] = useState(0); // forces relative-time re-render every 30s
   const copy = (text, key) => {
     navigator.clipboard.writeText(text);
     setCopied(key);
     setTimeout(() => setCopied(null), 1500);
   };
 
+  // Re-render every 30s so "3m ago" naturally becomes "4m ago" without a poll.
+  useEffect(() => {
+    const id = setInterval(() => setTick((n) => n + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
   const isOnline = status?.online;
   const isSleeping = status && !status.online;
+  const statsAge = timeAgo(summary?.updated_at);
 
   return (
     <div style={S.topBar}>
@@ -226,6 +251,14 @@ function TopBar({ status, onRefresh }) {
           </span>
           {isOnline && (
             <span style={S.playerCount}>{status.players?.online || 0} players</span>
+          )}
+          {statsAge && (
+            <span
+              style={S.statsAge}
+              title="When the playtime tracker last recorded a sample. Updates every ~5 min."
+            >
+              · stats {statsAge}
+            </span>
           )}
           <button onClick={onRefresh} style={S.refreshBtn} title="Refresh status">
             {Icons.refresh}
@@ -719,6 +752,7 @@ function MapSection({ status, fullscreen = false }) {
 function Dashboard() {
   const [tab, setTab] = useState("home");
   const [status, setStatus] = useState(null);
+  const [summary, setSummary] = useState(null);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -727,17 +761,33 @@ function Dashboard() {
     } catch (e) { /* silent */ }
   }, []);
 
-  useEffect(() => {
+  // Fetch the rolled-up stats file produced by the GitHub Action poller.
+  // Cache-busting query param so we always get the freshest commit, not
+  // a stale CDN copy. If the file doesn't exist yet (Action hasn't run),
+  // the catch swallows it and the indicator just doesn't render.
+  const fetchSummary = useCallback(async () => {
+    try {
+      const r = await fetch(`./data/playtime-summary.json?t=${Date.now()}`);
+      if (r.ok) setSummary(await r.json());
+    } catch (e) { /* silent */ }
+  }, []);
+
+  const refreshAll = useCallback(() => {
     fetchStatus();
-    const t = setInterval(fetchStatus, REFRESH_MS);
+    fetchSummary();
+  }, [fetchStatus, fetchSummary]);
+
+  useEffect(() => {
+    refreshAll();
+    const t = setInterval(refreshAll, REFRESH_MS);
     return () => clearInterval(t);
-  }, [fetchStatus]);
+  }, [refreshAll]);
 
   return (
     <div style={S.root}>
       <Sidebar active={tab} onChange={setTab} />
       <div style={S.main}>
-        <TopBar status={status} onRefresh={fetchStatus} />
+        <TopBar status={status} summary={summary} onRefresh={refreshAll} />
         <div style={S.content}>
           {tab === "home" && (
             <>
@@ -817,6 +867,11 @@ const S = {
   statusDot: { width: 10, height: 10, borderRadius: "50%", flexShrink: 0 },
   statusLabel: { fontSize: 14, color: C.textDim, fontWeight: 500 },
   playerCount: { fontSize: 13, color: C.textMuted, marginLeft: 2 },
+  statsAge: {
+    fontSize: 11, color: C.textMuted, marginLeft: 2,
+    fontFamily: '"JetBrains Mono", monospace', letterSpacing: 0.2,
+    cursor: "help",
+  },
   topRow2: {
     display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14,
   },

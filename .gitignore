@@ -1,10 +1,37 @@
+.env.local
+node_modules/
+random/
+
+# World data and downloads — never publish these
+*.zip
+world/
+staging/
+
+# Secrets
+*.env
+.env
+.env.*
+*.key
+*.pem
+secrets.json
+
+# BlueMap server-side files (if any drift into the repo)
+sql.php
+core.conf
+*.conf
+
+# OS / editor cruft
 .DS_Store
 Thumbs.db
+desktop.ini
 .vscode/
 .idea/
 *.swp
 *~
-.env
-.env.local
-node_modules/
-random/
+
+# Logs
+*.log
+last-render.err
+
+# PowerShell transcripts (if you ever enable them)
+*.txt.transcript
