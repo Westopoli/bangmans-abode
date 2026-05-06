@@ -1,11 +1,19 @@
 {
-  "updated_at": "2026-05-05T23:28:25.972Z",
-  "now_online": [],
+  "updated_at": "2026-05-06T01:13:04.981Z",
+  "now_online": [
+    "nobleninja072"
+  ],
   "last_seen": {
-    "Westoppoli": "2026-05-05T02:22:45.159Z"
+    "Westoppoli": "2026-05-05T02:22:45.159Z",
+    "nobleninja072": "2026-05-06T01:13:04.948Z"
   },
   "totals": {
     "Westoppoli": {
+      "minutes": 0,
+      "sessions": 1,
+      "longest_session_min": 0
+    },
+    "nobleninja072": {
       "minutes": 0,
       "sessions": 1,
       "longest_session_min": 0
@@ -13,6 +21,10 @@
   },
   "this_week": {
     "Westoppoli": {
+      "minutes": 0,
+      "sessions": 1
+    },
+    "nobleninja072": {
       "minutes": 0,
       "sessions": 1
     }
@@ -55,6 +67,10 @@
   "leaderboard": [
     {
       "name": "Westoppoli",
+      "minutes": 0
+    },
+    {
+      "name": "nobleninja072",
       "minutes": 0
     }
   ]
