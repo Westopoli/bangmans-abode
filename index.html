@@ -1193,7 +1193,7 @@ function MapSection({ status, fullscreen = false }) {
     else el.requestFullscreen?.();
   };
   return (
-    <div ref={wrapRef} style={{ ...S.mapWrap, ...(fullscreen ? { borderRadius: 0 } : {}) }}>
+    <div ref={wrapRef} style={{ ...S.mapWrap, ...(fullscreen ? { borderRadius: 0, margin: 0, minHeight: "calc(100vh - 90px)" } : {}) }}>
       {BLUEMAP_URL ? (
         <>
           <iframe src={BLUEMAP_URL} style={S.mapIframe} title="BlueMap" allowFullScreen />
