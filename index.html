@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bangman's Abode — Minecraft Server</title>
-  <meta name="description" content="Bangman's Abode Minecraft server dashboard. Check status, connect, and explore the world." />
+  <title>iCode Minecraft World</title>
+  <meta name="description" content="iCode Minecraft World server dashboard. Check status, connect, and explore the world." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛏</text></svg>" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -61,9 +61,8 @@ const BLUEMAP_URL = "./map/index.html"; // served from this same repo by the sna
 const STATUS_API = `https://api.mcsrvstat.us/3/${SERVER_JAVA}`;
 const SERVER_VERSION = "1.21.4";
 const SERVER_MAX_PLAYERS = 10;
-const SERVER_MOTD = "Bangman *cough* Bailey returns...";
+const SERVER_MOTD = "iCode Minecraft World";
 const REFRESH_MS = 60000;
-const DAD_IMG = "./Screenshot%202026-05-04%20at%2012.07.19%E2%80%AFPM.png";
 
 // ─── FONT ─────────────────────────────────────────────────────────────
 const fl = document.createElement("link");
@@ -129,12 +128,6 @@ const Icons = {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1z" />
       <path d="M9 21V12h6v9" />
-    </svg>
-  ),
-  dad: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21c0-4 4-7 8-7s8 3 8 7" />
     </svg>
   ),
   map: (
@@ -211,17 +204,9 @@ function Sidebar({ active, onChange }) {
     { id: "map", icon: Icons.map, label: "Map" },
     { id: "connect", icon: Icons.connect, label: "Connect" },
     { id: "logbook", icon: Icons.logbook, label: "Logbook" },
-    { id: "dad", icon: Icons.dad, label: "Dad" },
   ];
   return (
     <div style={S.sidebar}>
-      <div style={S.sidebarLogo}>
-        <img
-          src={DAD_IMG}
-          alt=""
-          style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }}
-        />
-      </div>
       {tabs.map((t) => (
         <button
           key={t.id}
@@ -266,7 +251,7 @@ function TopBar({ status, summary, onRefresh }) {
     <div style={S.topBar}>
       {/* Row 1: Title left, status right */}
       <div style={S.topRow1}>
-        <h1 style={S.topTitle}>Bangman's Abode</h1>
+        <h1 style={S.topTitle}>iCode Minecraft World</h1>
         <div style={S.statusDotWrap}>
           <div style={{
             ...S.statusDot,
@@ -426,7 +411,7 @@ function ConnectTab() {
             At the bottom of the screen, click <Val>Add Server</Val>.
           </Step>
           <Step n={4}>
-            For <Val>Server Name</Val>, type anything you like — "Bangman's Abode" works.
+            For <Val>Server Name</Val>, type anything you like — "iCode Minecraft World" works.
           </Step>
           <Step n={5}>
             For <Val>Server Address</Val>, copy and paste this:
@@ -454,7 +439,7 @@ function ConnectTab() {
             Scroll all the way down past the featured servers and tap <Val>Add Server</Val>.
           </Step>
           <Step n={4}>
-            For <Val>Server Name</Val>, type anything you want — "Bangman's Abode" is great.
+            For <Val>Server Name</Val>, type anything you want — "iCode Minecraft World" is great.
           </Step>
           <Step n={5}>
             For <Val>Server Address</Val>, copy and paste this:
@@ -1159,7 +1144,7 @@ function MapControlsGuide() {
 }
 
 // ─── FIRST-VISIT MAP OVERLAY ──────────────────────────────────────────
-const HINT_KEY = "bangman.mapHintSeen";
+const HINT_KEY = "icode.mapHintSeen";
 function MapHintOverlay() {
   const [visible, setVisible] = useState(() => {
     try { return localStorage.getItem(HINT_KEY) !== "1"; }
@@ -1238,7 +1223,7 @@ function Dashboard() {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const r = await fetch(STATUS_API, { headers: { "User-Agent": "BangmanDash/2.0" } });
+      const r = await fetch(STATUS_API, { headers: { "User-Agent": "iCodeDash/2.0" } });
       if (r.ok) setStatus(await r.json());
     } catch (e) { /* silent */ }
   }, []);
@@ -1296,11 +1281,6 @@ function Dashboard() {
           {tab === "map" && <MapSection status={status} fullscreen />}
           {tab === "connect" && <ConnectTab />}
           {tab === "logbook" && <LogbookTab summary={summary} />}
-          {tab === "dad" && (
-            <div style={S.dadWrap}>
-              <img src={DAD_IMG} alt="Dad" style={S.dadImg} />
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -1317,11 +1297,6 @@ const S = {
   sidebar: {
     width: 64, minWidth: 64, background: C.bg1, borderRight: `1px solid ${C.border}`,
     display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 8, gap: 2,
-  },
-  sidebarLogo: {
-    width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center",
-    marginBottom: 20, borderRadius: "50%", background: C.bg3,
-    border: `2px solid ${C.border}`, overflow: "hidden",
   },
   sidebarBtn: {
     position: "relative", width: 56, padding: "10px 0 6px", border: "none", borderRadius: 8,
@@ -1595,16 +1570,6 @@ const S = {
     fontSize: 24, color: C.accent, fontWeight: 300, flexShrink: 0,
     marginLeft: 24,
   },
-  // Dad tab
-  dadWrap: {
-    flex: 1, width: "100%", height: "100%", overflow: "hidden",
-    display: "flex", alignItems: "center", justifyContent: "center",
-    background: C.bg0,
-  },
-  dadImg: {
-    width: "100%", height: "100%", objectFit: "cover", display: "block",
-  },
-
   // Map Controls Guide (Home)
   mapGuide: {
     margin: "22px 28px 0", padding: "22px 28px",
