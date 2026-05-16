@@ -1193,7 +1193,7 @@ function MapSection({ status, fullscreen = false }) {
     else el.requestFullscreen?.();
   };
   return (
-    <div ref={wrapRef} style={{ ...S.mapWrap, ...(fullscreen ? { borderRadius: 0, margin: 0, minHeight: "calc(100vh - 90px)" } : {}) }}>
+    <div ref={wrapRef} style={{ ...S.mapWrap, ...(fullscreen ? { borderRadius: 0, minHeight: "calc(100vh - 140px)" } : {}) }}>
       {BLUEMAP_URL ? (
         <>
           <iframe src={BLUEMAP_URL} style={S.mapIframe} title="BlueMap" allowFullScreen />
@@ -1415,7 +1415,7 @@ const S = {
   mapSublabel: { fontSize: 11, color: C.textMuted, textAlign: "center", maxWidth: 200 },
   // Player panel
   playerPanel: {
-    position: "absolute", top: 12, right: 12, width: 160, background: `${C.bg1}ee`,
+    position: "absolute", top: 64, right: 12, width: 160, background: `${C.bg1}ee`,
     border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px",
     backdropFilter: "blur(8px)",
   },
