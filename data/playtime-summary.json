@@ -1,16 +1,11 @@
 {
-  "updated_at": "2026-06-04T05:18:06.286Z",
+  "updated_at": "2026-06-04T09:06:32.697Z",
   "now_online": [],
   "last_seen": {
     "Westoppoli": "2026-05-05T02:22:45.159Z",
     "nobleninja072": "2026-05-06T01:13:04.948Z"
   },
   "totals": {
-    "Westoppoli": {
-      "minutes": 0,
-      "sessions": 1,
-      "longest_session_min": 0
-    },
     "nobleninja072": {
       "minutes": 0,
       "sessions": 1,
@@ -54,10 +49,6 @@
     0
   ],
   "leaderboard": [
-    {
-      "name": "Westoppoli",
-      "minutes": 0
-    },
     {
       "name": "nobleninja072",
       "minutes": 0
