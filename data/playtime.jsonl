@@ -464,3 +464,4 @@
 {"t":"2026-06-14T23:15:58.226Z","online_players":[],"player_count":0,"online":true}
 {"t":"2026-06-15T01:42:54.356Z","online_players":[],"player_count":null,"online":false}
 {"t":"2026-06-15T07:02:12.031Z","online_players":[],"player_count":0,"online":true}
+{"t":"2026-06-15T13:24:38.683Z","online_players":null,"player_count":null,"online":null,"reason":"http 503"}
